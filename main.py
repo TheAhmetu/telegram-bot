@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import pytz
 import json
+import asyncio
 
 STEP = 11
 DATA_FILE = "data.json"
@@ -21,11 +22,6 @@ def home():
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = threading.Thread(target=run_flask)
-    t.daemon = True
-    t.start()
 
 def get_today_date_str():
     tz = pytz.timezone('Europe/Istanbul')
@@ -139,12 +135,7 @@ async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await message.reply_text(f"Mesaj silinemedi: {e}")
 
-if __name__ == "__main__":
-    print("Veriler yükleniyor...")
-    load_data()
-    print("Flask sunucusu başlatılıyor...")
-    keep_alive()
-
+def run_bot():
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not TOKEN:
         print("Lütfen TELEGRAM_BOT_TOKEN ortam değişkenini ayarlayın.")
@@ -158,3 +149,24 @@ if __name__ == "__main__":
 
     print("Bot başlatılıyor...")
     app_bot.run_polling()
+
+if __name__ == "__main__":
+    print("Veriler yükleniyor...")
+    load_data()
+
+    print("Flask sunucusu başlatılıyor...")
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    # Botu ayrı thread'te başlat
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+
+    # Ana thread'in bitmemesi için sonsuz döngü
+    try:
+        while True:
+            pass
+    except KeyboardInterrupt:
+        print("Program durduruldu.")
