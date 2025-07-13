@@ -14,7 +14,12 @@ DATA_FILE = "data.json"
 global_number = 1
 sent_messages = []
 
+# Flask setup
 app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot çalışıyor!"
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
@@ -23,13 +28,6 @@ def keep_alive():
     t = threading.Thread(target=run_flask)
     t.daemon = True
     t.start()
-
-@app.route('/')
-def home():
-    return "Bot çalışıyor!"
-
-def run_flask():
-    app.run(host='0.0.0.0', port=8080)
 
 def get_today_date_str():
     tz = pytz.timezone('Europe/Istanbul')
@@ -143,45 +141,25 @@ async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await message.reply_text(f"Mesaj silinemedi: {e}")
 
-def run_bot():
+async def start_bot():
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not TOKEN:
         print("Lütfen TELEGRAM_BOT_TOKEN ortam değişkenini ayarlayın.")
-        exit(1)
+        return
 
-    app_bot = ApplicationBuilder().token(TOKEN).build()
-    app_bot.add_handler(CommandHandler("al", al_command))
-    app_bot.add_handler(CommandHandler("edit", edit_command))
-    app_bot.add_handler(CommandHandler("sil", sil_command))
-    app_bot.add_handler(CallbackQueryHandler(button))
+    application = ApplicationBuilder().token(TOKEN).build()
+
+    application.add_handler(CommandHandler("al", al_command))
+    application.add_handler(CommandHandler("edit", edit_command))
+    application.add_handler(CommandHandler("sil", sil_command))
+    application.add_handler(CallbackQueryHandler(button))
 
     print("Bot başlatılıyor...")
-    app_bot.run_polling()
+    await application.run_polling()
 
 if __name__ == "__main__":
     print("Veriler yükleniyor...")
     load_data()
-
     print("Flask sunucusu başlatılıyor...")
-    keep_alive()  # Flask thread'de çalışsın
-
-    TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if not TOKEN:
-        print("Lütfen TELEGRAM_BOT_TOKEN ortam değişkenini ayarlayın.")
-        exit(1)
-
-    print("Bot başlatılıyor...")
-    from telegram.ext import ApplicationBuilder
-
-    import asyncio
-
-    async def main():
-        app_bot = ApplicationBuilder().token(TOKEN).build()
-        app_bot.add_handler(CommandHandler("al", al_command))
-        app_bot.add_handler(CommandHandler("edit", edit_command))
-        app_bot.add_handler(CommandHandler("sil", sil_command))
-        app_bot.add_handler(CallbackQueryHandler(button))
-
-        await app_bot.run_polling()
-
-    asyncio.run(main())
+    keep_alive()
+    asyncio.run(start_bot())
