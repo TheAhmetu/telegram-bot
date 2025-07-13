@@ -1,47 +1,48 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
-from flask import Flask
-import threading
+import asyncio
 import os
-from datetime import datetime
-import pytz
+import threading
 import json
+from datetime import datetime
+
+import pytz
+from flask import Flask
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+)
 
 STEP = 11
 DATA_FILE = "data.json"
 
-# Global durum değişkenleri
 global_number = 1
-sent_messages = []  # [{'message_id': int, 'from_num': int, 'to_num': int}]
+sent_messages = []  # Mesaj bilgileri: [{'message_id': int, 'from_num': int, 'to_num': int}]
 
-# Flask web sunucusu
-app = Flask('')
+# Flask app
+app = Flask(__name__)
 
-
-@app.route('/')
+@app.route("/")
 def home():
     return "Bot çalışıyor!"
 
-
-def run():
-    app.run(host='0.0.0.0', port=8080)
-
+def run_flask():
+    # Debug ve reloader kapalı, Render gibi platformlarda sorun çıkmasın diye
+    app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
 
 def keep_alive():
-    t = threading.Thread(target=run)
-    t.daemon = True  # Program kapanınca thread de kapanır
+    t = threading.Thread(target=run_flask)
+    t.daemon = True
     t.start()
 
-
 def get_today_date_str():
-    tz = pytz.timezone('Europe/Istanbul')
+    tz = pytz.timezone("Europe/Istanbul")
     now = datetime.now(tz)
     return now.strftime("%d.%m.%Y")
 
-
 def format_numbers(start):
-    return f"{start:05d} - {start + STEP - 1:05d}"
-
+    return f"{start:05d} - {start + STEP -1:05d}"
 
 def save_data():
     global global_number, sent_messages
@@ -50,11 +51,12 @@ def save_data():
             json.dump(
                 {
                     "global_number": global_number,
-                    "sent_messages": sent_messages
-                }, f)
+                    "sent_messages": sent_messages,
+                },
+                f,
+            )
     except Exception as e:
         print(f"Data kaydedilirken hata: {e}")
-
 
 def load_data():
     global global_number, sent_messages
@@ -67,31 +69,34 @@ def load_data():
         except Exception as e:
             print(f"Data yüklenirken hata: {e}")
 
-
+# Komutlar
 async def al_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number, sent_messages
+
     user = update.effective_user.full_name or update.effective_user.first_name
     today = get_today_date_str()
     from_num = global_number
     to_num = from_num + STEP - 1
+
     text = f"{user}\n{today} {format_numbers(from_num)}"
-
     keyboard = [[InlineKeyboardButton("Sonraki", callback_data="next")]]
-    sent = await update.message.reply_text(
-        text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-    sent_messages.append({
-        "message_id": sent.message_id,
-        "from_num": from_num,
-        "to_num": to_num
-    })
+    sent = await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    sent_messages.append(
+        {
+            "message_id": sent.message_id,
+            "from_num": from_num,
+            "to_num": to_num,
+        }
+    )
 
     global_number = to_num + 1
     save_data()
 
-
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number, sent_messages
+
     query = update.callback_query
     await query.answer()
 
@@ -99,21 +104,22 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = get_today_date_str()
     from_num = global_number
     to_num = from_num + STEP - 1
+
     text = f"{user}\n{today} {format_numbers(from_num)}"
-
     keyboard = [[InlineKeyboardButton("Sonraki", callback_data="next")]]
-    sent = await query.message.reply_text(
-        text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-    sent_messages.append({
-        "message_id": sent.message_id,
-        "from_num": from_num,
-        "to_num": to_num
-    })
+    sent = await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    sent_messages.append(
+        {
+            "message_id": sent.message_id,
+            "from_num": from_num,
+            "to_num": to_num,
+        }
+    )
 
     global_number = to_num + 1
     save_data()
-
 
 async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number
@@ -121,20 +127,16 @@ async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         num = int(context.args[0])
         global_number = num
         save_data()
-        await update.message.reply_text(
-            f"Başlangıç numarası {num:05d} olarak ayarlandı.")
+        await update.message.reply_text(f"Başlangıç numarası {num:05d} olarak ayarlandı.")
     else:
-        await update.message.reply_text(
-            "Lütfen geçerli bir sayı girin. Örnek: /edit 10002")
-
+        await update.message.reply_text("Lütfen geçerli bir sayı girin. Örnek: /edit 10002")
 
 async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number, sent_messages
-    message = update.message
 
+    message = update.message
     if not message.reply_to_message:
-        await message.reply_text(
-            "Lütfen silmek istediğiniz mesajı alıntılayarak /sil yazın.")
+        await message.reply_text("Lütfen silmek istediğiniz mesajı alıntılayarak /sil yazın.")
         return
 
     reply_id = message.reply_to_message.message_id
@@ -146,13 +148,11 @@ async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     last_sent = sent_messages[-1]
 
     if reply_id != last_sent["message_id"]:
-        await message.reply_text(
-            "Sadece botun son gönderdiği mesajı silebilirsiniz.")
+        await message.reply_text("Sadece botun son gönderdiği mesajı silebilirsiniz.")
         return
 
     try:
-        await context.bot.delete_message(chat_id=message.chat_id,
-                                         message_id=reply_id)
+        await context.bot.delete_message(chat_id=message.chat_id, message_id=reply_id)
         silinen = sent_messages.pop()
         global_number = silinen["from_num"]
         save_data()
@@ -160,15 +160,17 @@ async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await message.reply_text(f"Mesaj silinemedi: {e}")
 
-
-if __name__ == "__main__":
+async def main():
+    print("Veriler yükleniyor...")
     load_data()
+
+    print("Flask sunucusu başlatılıyor...")
     keep_alive()
 
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not TOKEN:
         print("Lütfen TELEGRAM_BOT_TOKEN ortam değişkenini ayarlayın.")
-        exit(1)
+        return
 
     app_bot = ApplicationBuilder().token(TOKEN).build()
     app_bot.add_handler(CommandHandler("al", al_command))
@@ -177,4 +179,7 @@ if __name__ == "__main__":
     app_bot.add_handler(CallbackQueryHandler(button))
 
     print("Bot başlatılıyor...")
-    app_bot.run_polling()
+    await app_bot.run_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main())
