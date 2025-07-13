@@ -162,4 +162,7 @@ if __name__ == "__main__":
     load_data()
     print("Flask sunucusu başlatılıyor...")
     keep_alive()
-    asyncio.run(start_bot())
+    import nest_asyncio
+nest_asyncio.apply()
+asyncio.get_event_loop().create_task(start_bot())
+
