@@ -3,10 +3,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 from flask import Flask
 import threading
 import os
-import json
 from datetime import datetime
 import pytz
-import nest_asyncio
+import json
 import asyncio
 
 STEP = 11
@@ -66,9 +65,16 @@ async def al_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from_num = global_number
     to_num = from_num + STEP - 1
     text = f"{user}\n{today} {format_numbers(from_num)}"
+
     keyboard = [[InlineKeyboardButton("Sonraki", callback_data="next")]]
     sent = await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-    sent_messages.append({"message_id": sent.message_id, "from_num": from_num, "to_num": to_num})
+
+    sent_messages.append({
+        "message_id": sent.message_id,
+        "from_num": from_num,
+        "to_num": to_num
+    })
+
     global_number = to_num + 1
     save_data()
 
@@ -76,14 +82,22 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number, sent_messages
     query = update.callback_query
     await query.answer()
+
     user = query.from_user.full_name or query.from_user.first_name
     today = get_today_date_str()
     from_num = global_number
     to_num = from_num + STEP - 1
     text = f"{user}\n{today} {format_numbers(from_num)}"
+
     keyboard = [[InlineKeyboardButton("Sonraki", callback_data="next")]]
     sent = await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-    sent_messages.append({"message_id": sent.message_id, "from_num": from_num, "to_num": to_num})
+
+    sent_messages.append({
+        "message_id": sent.message_id,
+        "from_num": from_num,
+        "to_num": to_num
+    })
+
     global_number = to_num + 1
     save_data()
 
@@ -100,17 +114,23 @@ async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number, sent_messages
     message = update.message
+
     if not message.reply_to_message:
         await message.reply_text("Lütfen silmek istediğiniz mesajı alıntılayarak /sil yazın.")
         return
+
     reply_id = message.reply_to_message.message_id
+
     if not sent_messages:
         await message.reply_text("Silinecek mesaj bulunamadı.")
         return
+
     last_sent = sent_messages[-1]
+
     if reply_id != last_sent["message_id"]:
         await message.reply_text("Sadece botun son gönderdiği mesajı silebilirsiniz.")
         return
+
     try:
         await context.bot.delete_message(chat_id=message.chat_id, message_id=reply_id)
         silinen = sent_messages.pop()
@@ -120,7 +140,13 @@ async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await message.reply_text(f"Mesaj silinemedi: {e}")
 
-async def start_bot():
+async def main():
+    print("Veriler yükleniyor...")
+    load_data()
+
+    print("Flask sunucusu başlatılıyor...")
+    keep_alive()
+
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not TOKEN:
         print("Lütfen TELEGRAM_BOT_TOKEN ortam değişkenini ayarlayın.")
@@ -136,13 +162,4 @@ async def start_bot():
     await application.run_polling()
 
 if __name__ == "__main__":
-    print("Veriler yükleniyor...")
-    load_data()
-    print("Flask sunucusu başlatılıyor...")
-    keep_alive()
-
-    # Render uyumlu çalıştırma
-    nest_asyncio.apply()
-    loop = asyncio.get_event_loop()
-    loop.create_task(start_bot())
-    loop.run_forever()
+    asyncio.run(main())
