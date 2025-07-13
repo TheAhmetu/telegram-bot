@@ -177,10 +177,9 @@ def health():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    if request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), app.bot)
-        # asyncio event loop çağrısı, Flask içinde coroutine tetikleme
-        asyncio.get_event_loop().create_task(app.application.process_update(update))
+    update = Update.de_json(request.get_json(force=True), app.bot)
+    # En güvenli yol: Her istek için yeni event loop (asyncio.run)
+    asyncio.run(app.application.process_update(update))
     return "OK"
 
 # ---- BOT BAŞLATMA ----
@@ -203,8 +202,7 @@ def start_bot_and_webhook():
 
     # Webhook ayarı
     logger.info("Webhook ayarlanıyor...")
-    # /webhook path'ine Telegram'ın ulaşabilmesi gerekiyor!
-    asyncio.get_event_loop().run_until_complete(
+    asyncio.run(
         application.bot.set_webhook(WEBHOOK_URL + "/webhook")
     )
     logger.info("Webhook ayarlandı: %s/webhook", WEBHOOK_URL)
