@@ -155,18 +155,25 @@ if __name__ == "__main__":
     load_data()
 
     print("Flask sunucusu başlatılıyor...")
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
+    keep_alive()  # Flask thread'de çalışsın
 
-    # Botu ayrı thread'te başlat
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
+    TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not TOKEN:
+        print("Lütfen TELEGRAM_BOT_TOKEN ortam değişkenini ayarlayın.")
+        exit(1)
 
-    # Ana thread'in bitmemesi için sonsuz döngü
-    try:
-        while True:
-            pass
-    except KeyboardInterrupt:
-        print("Program durduruldu.")
+    print("Bot başlatılıyor...")
+    from telegram.ext import ApplicationBuilder
+
+    import asyncio
+
+    async def main():
+        app_bot = ApplicationBuilder().token(TOKEN).build()
+        app_bot.add_handler(CommandHandler("al", al_command))
+        app_bot.add_handler(CommandHandler("edit", edit_command))
+        app_bot.add_handler(CommandHandler("sil", sil_command))
+        app_bot.add_handler(CallbackQueryHandler(button))
+
+        await app_bot.run_polling()
+
+    asyncio.run(main())
