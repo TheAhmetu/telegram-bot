@@ -1,5 +1,8 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler,
+    CallbackQueryHandler, ContextTypes
+)
 from flask import Flask
 import threading
 import os
@@ -21,6 +24,7 @@ def home():
     return "Bot çalışıyor!"
 
 def run_flask():
+    # Flask'ı ayrı bir thread'de çalıştır
     app.run(host='0.0.0.0', port=8080)
 
 def keep_alive():
@@ -143,7 +147,6 @@ async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def main():
     print("Veriler yükleniyor...")
     load_data()
-
     print("Flask sunucusu başlatılıyor...")
     keep_alive()
 
