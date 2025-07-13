@@ -6,7 +6,6 @@ import os
 from datetime import datetime
 import pytz
 import json
-import asyncio  # Eklendi
 
 STEP = 11
 DATA_FILE = "data.json"
@@ -168,11 +167,11 @@ async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await message.reply_text(f"Mesaj silinemedi: {e}")
 
+def run_flask():
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
+
 def run_bot():
-    # Yeni event loop oluştur
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not TOKEN:
         print("Lütfen TELEGRAM_BOT_TOKEN ortam değişkenini ayarlayın.")
@@ -190,10 +189,9 @@ def run_bot():
 if __name__ == "__main__":
     load_data()
     
-    # Botu ayrı thread'de başlat
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
+    # Flask'ı ayrı thread'de başlat
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
     
-    # Flask'ı ana thread'de başlat
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    # Botu ana thread'de başlat
+    run_bot()
