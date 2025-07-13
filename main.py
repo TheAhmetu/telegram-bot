@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import pytz
 import json
+import asyncio  # Eklendi
 
 STEP = 11
 DATA_FILE = "data.json"
@@ -168,6 +169,10 @@ async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(f"Mesaj silinemedi: {e}")
 
 def run_bot():
+    # Yeni event loop oluştur
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not TOKEN:
         print("Lütfen TELEGRAM_BOT_TOKEN ortam değişkenini ayarlayın.")
