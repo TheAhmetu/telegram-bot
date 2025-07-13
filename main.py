@@ -1,26 +1,29 @@
 import os
 import json
-import logging
 import threading
+import logging
 from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram.ext import (
+    Application, CommandHandler, CallbackQueryHandler, ContextTypes
+)
 from datetime import datetime
 import pytz
+import asyncio
 
-# ============ Log Ayarları ============
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# ============ Global Değişkenler ============
+# ---- GLOBAL DEĞİŞKENLER ----
 STEP = 11
 DATA_FILE = "data.json"
 global_lock = threading.Lock()
 global_number = 1
 sent_messages = []
+
+# ---- LOGLAMA ----
+logging.basicConfig(
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 def get_today_date_str():
     tz = pytz.timezone('Europe/Istanbul')
@@ -34,11 +37,10 @@ def save_data():
     try:
         with global_lock:
             with open(DATA_FILE, "w") as f:
-                json.dump(
-                    {
-                        "global_number": global_number,
-                        "sent_messages": sent_messages
-                    }, f, ensure_ascii=False)
+                json.dump({
+                    "global_number": global_number,
+                    "sent_messages": sent_messages
+                }, f, ensure_ascii=False)
     except Exception as e:
         logger.error(f"Data kaydedilirken hata: {e}")
 
@@ -50,12 +52,11 @@ def load_data():
                 data = json.load(f)
                 global_number = data.get("global_number", 1)
                 sent_messages = data.get("sent_messages", [])
-                logger.info(f"Data yüklendi: Başlangıç numarası: {global_number}, Mesaj sayısı: {len(sent_messages)}")
         except Exception as e:
             logger.error(f"Data yüklenirken hata: {e}")
 
-# ============ Bot Fonksiyonları ============
-async def al_command(update: Update, context):
+# ---- BOT HANDLERLARI ----
+async def al_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number, sent_messages
     user = update.effective_user.full_name or update.effective_user.first_name
     today = get_today_date_str()
@@ -77,11 +78,11 @@ async def al_command(update: Update, context):
             save_data()
     except Exception as e:
         with global_lock:
-            global_number = from_num  # Revert if failed
+            global_number = from_num
         await update.message.reply_text(f"Hata oluştu: {e}")
         logger.error(f"al_command hatası: {e}")
 
-async def button(update: Update, context):
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number, sent_messages
     query = update.callback_query
     await query.answer()
@@ -105,11 +106,11 @@ async def button(update: Update, context):
             save_data()
     except Exception as e:
         with global_lock:
-            global_number = from_num  # Revert if failed
+            global_number = from_num
         await query.message.reply_text(f"Hata oluştu: {e}")
         logger.error(f"button callback hatası: {e}")
 
-async def edit_command(update: Update, context):
+async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number
     try:
         if context.args and context.args[0].isdigit():
@@ -126,7 +127,7 @@ async def edit_command(update: Update, context):
     except Exception as e:
         logger.error(f"edit_command hatası: {e}")
 
-async def sil_command(update: Update, context):
+async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number, sent_messages
     try:
         message = update.message
@@ -144,7 +145,6 @@ async def sil_command(update: Update, context):
                 await message.reply_text(
                     "Sadece botun son gönderdiği mesajı silebilirsiniz.")
                 return
-            # Geçici olarak durumu geri al
             temp_messages = sent_messages[:-1]
             temp_global = last_sent["from_num"]
         try:
@@ -164,10 +164,8 @@ async def sil_command(update: Update, context):
     except Exception as e:
         logger.error(f"sil_command hatası: {e}")
 
-# ============ Flask & Webhook ============
-
+# ---- FLASK ----
 app = Flask(__name__)
-application = None  # Application objesini globalde tutuyoruz
 
 @app.route('/')
 def home():
@@ -177,35 +175,41 @@ def home():
 def health():
     return "OK", 200
 
-@app.route('/webhook', methods=["POST"])
+@app.route('/webhook', methods=['POST'])
 def webhook():
-    if application:
-        update = Update.de_json(request.get_json(force=True), application.bot)
-        # Handler'lar async, bu yüzden asyncio ile tetiklenmeli
-        import asyncio
-        asyncio.create_task(application.process_update(update))
+    if request.method == "POST":
+        update = Update.de_json(request.get_json(force=True), app.bot)
+        # asyncio event loop çağrısı, Flask içinde coroutine tetikleme
+        asyncio.get_event_loop().create_task(app.application.process_update(update))
     return "OK"
 
-def start_app():
-    global application
+# ---- BOT BAŞLATMA ----
+def start_bot_and_webhook():
     load_data()
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-    WEBHOOK_URL = os.environ.get("WEBHOOK_URL")  # Bunu Render dashboardda ekleyeceksin
+    WEBHOOK_URL = os.environ.get("WEBHOOK_URL")  # örnek: https://senin-botun.onrender.com
+
     if not TOKEN or not WEBHOOK_URL:
         logger.critical("TELEGRAM_BOT_TOKEN veya WEBHOOK_URL ortam değişkeni eksik!")
         exit(1)
     application = Application.builder().token(TOKEN).build()
-    # Handler'lar ekleniyor
     application.add_handler(CommandHandler("al", al_command))
     application.add_handler(CommandHandler("edit", edit_command))
     application.add_handler(CommandHandler("sil", sil_command))
     application.add_handler(CallbackQueryHandler(button))
+    # Application objelerini Flask app'e bağla!
+    app.application = application
+    app.bot = application.bot
 
-    # Webhook ayarlanıyor
-    application.bot.set_webhook(WEBHOOK_URL + "/webhook")
+    # Webhook ayarı
+    logger.info("Webhook ayarlanıyor...")
+    # /webhook path'ine Telegram'ın ulaşabilmesi gerekiyor!
+    asyncio.get_event_loop().run_until_complete(
+        application.bot.set_webhook(WEBHOOK_URL + "/webhook")
+    )
     logger.info("Webhook ayarlandı: %s/webhook", WEBHOOK_URL)
 
 if __name__ == "__main__":
-    start_app()
+    start_bot_and_webhook()
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
