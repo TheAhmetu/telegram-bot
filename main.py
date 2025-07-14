@@ -162,12 +162,11 @@ def main():
     app.add_handler(CommandHandler("edit", edit_command))
     app.add_handler(CommandHandler("sil", sil_command))
     app.add_handler(CallbackQueryHandler(button))
-    # Webhook'u başlat
+    # Webhook'u başlat (DİKKAT: webhook_path YOK!!!)
     app.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get('PORT', 10000)),
-        webhook_url=f"{WEBHOOK_URL}/webhook",
-        webhook_path="/webhook"
+        webhook_url=f"{WEBHOOK_URL}/webhook"
     )
 
 if __name__ == "__main__":
