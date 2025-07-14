@@ -2,8 +2,11 @@ services:
   - type: web
     name: telegram-bot
     env: python
-    buildCommand: ""
-    startCommand: bash start.sh
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
-        sync: false
+        value: <senin-bot-tokenin>
+      - key: WEBHOOK_URL
+        value: https://telegram-bot-3rda.onrender.com
