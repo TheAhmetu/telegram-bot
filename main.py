@@ -177,6 +177,10 @@ def webhook():
     asyncio.run(app.application.process_update(update))
     return "OK"
 
+async def async_startup(application, webhook_url):
+    await application.initialize()
+    await application.bot.set_webhook(webhook_url + "/webhook")
+
 def start_bot_and_webhook():
     load_data()
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -192,8 +196,7 @@ def start_bot_and_webhook():
     app.application = application
     app.bot = application.bot
     logger.info("Webhook ayarlanıyor...")
-    asyncio.run(application.initialize())
-    asyncio.run(application.bot.set_webhook(WEBHOOK_URL + "/webhook"))
+    asyncio.run(async_startup(application, WEBHOOK_URL))
     logger.info("Webhook ayarlandı: %s/webhook", WEBHOOK_URL)
 
 if __name__ == "__main__":
