@@ -11,14 +11,12 @@ from datetime import datetime
 import pytz
 import asyncio
 
-# ---- GLOBAL DEĞİŞKENLER ----
 STEP = 11
 DATA_FILE = "data.json"
 global_lock = threading.Lock()
 global_number = 1
 sent_messages = []
 
-# ---- LOGLAMA ----
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -55,7 +53,6 @@ def load_data():
         except Exception as e:
             logger.error(f"Data yüklenirken hata: {e}")
 
-# ---- BOT HANDLERLARI ----
 async def al_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global global_number, sent_messages
     user = update.effective_user.full_name or update.effective_user.first_name
@@ -164,7 +161,6 @@ async def sil_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"sil_command hatası: {e}")
 
-# ---- FLASK ----
 app = Flask(__name__)
 
 @app.route('/')
@@ -178,16 +174,13 @@ def health():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     update = Update.de_json(request.get_json(force=True), app.bot)
-    # En güvenli yol: Her istek için yeni event loop (asyncio.run)
     asyncio.run(app.application.process_update(update))
     return "OK"
 
-# ---- BOT BAŞLATMA ----
 def start_bot_and_webhook():
     load_data()
     TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-    WEBHOOK_URL = os.environ.get("WEBHOOK_URL")  # örnek: https://senin-botun.onrender.com
-
+    WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
     if not TOKEN or not WEBHOOK_URL:
         logger.critical("TELEGRAM_BOT_TOKEN veya WEBHOOK_URL ortam değişkeni eksik!")
         exit(1)
@@ -196,15 +189,11 @@ def start_bot_and_webhook():
     application.add_handler(CommandHandler("edit", edit_command))
     application.add_handler(CommandHandler("sil", sil_command))
     application.add_handler(CallbackQueryHandler(button))
-    # Application objelerini Flask app'e bağla!
     app.application = application
     app.bot = application.bot
-
-    # Webhook ayarı
     logger.info("Webhook ayarlanıyor...")
-    asyncio.run(
-        application.bot.set_webhook(WEBHOOK_URL + "/webhook")
-    )
+    asyncio.run(application.initialize())
+    asyncio.run(application.bot.set_webhook(WEBHOOK_URL + "/webhook"))
     logger.info("Webhook ayarlandı: %s/webhook", WEBHOOK_URL)
 
 if __name__ == "__main__":
